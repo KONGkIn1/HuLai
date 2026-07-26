@@ -52,6 +52,12 @@ public interface OrderService {
      */
     OrderPaymentVO payment(OrdersPaymentDTO ordersPaymentDTO);
 
+    /**
+     * 用户催单
+     * @param id
+     */
+    void reminder(Long id);
+
     // ==================== 商家端 ====================
 
     /**

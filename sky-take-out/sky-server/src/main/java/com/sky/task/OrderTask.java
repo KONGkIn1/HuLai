@@ -42,6 +42,9 @@ public class OrderTask {
         }
     }
 
+    /**
+     * 处理配送完成订单的方法
+     */
     @Scheduled(cron = "0 0 1 * * ?")//每天凌晨一点触发一次
     public void processDeliveryOrder(){
         log.info("定时处理配送订单：{}", LocalDateTime.now());

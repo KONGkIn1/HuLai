@@ -14,9 +14,11 @@ import com.sky.exception.ShoppingCartBusinessException;
 import com.sky.mapper.*;
 import com.sky.properties.ShopAddressProperties;
 import com.sky.result.PageResult;
+import com.sky.websocket.WebSocketServer;
 import com.sky.service.OrderService;
 import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderStatisticsVO;
+import lombok.extern.slf4j.Slf4j;
 import com.sky.vo.OrderSubmitVO;
 import com.sky.vo.OrderVO;
 import org.springframework.beans.BeanUtils;
@@ -34,6 +36,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class OrderServiceImpl implements OrderService {
 
     @Autowired
@@ -50,6 +53,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private ShopAddressProperties shopAddressProperties;
+
+    @Autowired
+    private WebSocketServer webSocketServer;
 
     /**
      * 用户下单
@@ -105,6 +111,17 @@ public class OrderServiceImpl implements OrderService {
 
         //清空当前用户的购物车数据
         shoppingCartMapper.deleteByUserId(userId);
+
+        //通过WebSocket向商家发送来单提醒
+        try {
+            JSONObject wsMsg = new JSONObject();
+            wsMsg.put("type", 1);  // 1=来单提醒
+            wsMsg.put("orderId", orders.getId());
+            wsMsg.put("content", "您有新的订单，请及时处理");
+            webSocketServer.sendToAllClient(wsMsg.toJSONString());
+        } catch (Exception e) {
+            log.error("WebSocket来单提醒发送失败", e);
+        }
 
         //封装vo返回结果
         OrderSubmitVO orderSubmitVO = OrderSubmitVO.builder()
@@ -338,6 +355,23 @@ public class OrderServiceImpl implements OrderService {
                 .signType("MD5")
                 .packageStr("prepay_id=mock_prepay_id")
                 .build();
+    }
+
+    /**
+     * 用户催单
+     * @param id
+     */
+    public void reminder(Long id) {
+        Orders ordersDB = orderMapper.getById(id);
+        if (ordersDB == null) {
+            throw new OrderBusinessException(MessageConstant.ORDER_NOT_FOUND);
+        }
+        // 通过WebSocket向商家发送催单提醒
+        JSONObject wsMsg = new JSONObject();
+        wsMsg.put("type", 2);  // 2=催单提醒
+        wsMsg.put("orderId", id);
+        wsMsg.put("content", "订单号" + ordersDB.getNumber() + "，用户催单了，请尽快处理");
+        webSocketServer.sendToAllClient(wsMsg.toJSONString());
     }
 
     // ==================== 商家端 ====================
