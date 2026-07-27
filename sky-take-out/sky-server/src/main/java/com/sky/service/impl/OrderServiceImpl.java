@@ -118,7 +118,10 @@ public class OrderServiceImpl implements OrderService {
             wsMsg.put("type", 1);  // 1=来单提醒
             wsMsg.put("orderId", orders.getId());
             wsMsg.put("content", "您有新的订单，请及时处理");
-            webSocketServer.sendToAllClient(wsMsg.toJSONString());
+            String msg = wsMsg.toJSONString();
+            log.info("WebSocket准备发送来单提醒: {}", msg);
+            webSocketServer.sendToAllClient(msg);
+            log.info("WebSocket来单提醒发送完毕");
         } catch (Exception e) {
             log.error("WebSocket来单提醒发送失败", e);
         }
@@ -211,15 +214,17 @@ public class OrderServiceImpl implements OrderService {
         conn.setRequestMethod("GET");
         conn.setConnectTimeout(5000);
         conn.setReadTimeout(5000);
-        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-        StringBuilder sb = new StringBuilder();
-        String line;
-        while ((line = in.readLine()) != null) {
-            sb.append(line);
+        try (BufferedReader in = new BufferedReader(
+                new InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = in.readLine()) != null) {
+                sb.append(line);
+            }
+            return sb.toString();
+        } finally {
+            conn.disconnect();
         }
-        in.close();
-        conn.disconnect();
-        return sb.toString();
     }
 
     /**
