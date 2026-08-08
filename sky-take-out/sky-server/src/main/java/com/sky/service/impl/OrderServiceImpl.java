@@ -14,7 +14,7 @@ import com.sky.exception.ShoppingCartBusinessException;
 import com.sky.mapper.*;
 import com.sky.properties.ShopAddressProperties;
 import com.sky.result.PageResult;
-import com.sky.websocket.WebSocketServer;
+import com.sky.mq.OrderNotifyProducer;
 import com.sky.service.OrderService;
 import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderStatisticsVO;
@@ -55,7 +55,7 @@ public class OrderServiceImpl implements OrderService {
     private ShopAddressProperties shopAddressProperties;
 
     @Autowired
-    private WebSocketServer webSocketServer;
+    private OrderNotifyProducer orderNotifyProducer;
 
     /**
      * 用户下单
@@ -112,19 +112,8 @@ public class OrderServiceImpl implements OrderService {
         //清空当前用户的购物车数据
         shoppingCartMapper.deleteByUserId(userId);
 
-        //通过WebSocket向商家发送来单提醒
-        try {
-            JSONObject wsMsg = new JSONObject();
-            wsMsg.put("type", 1);  // 1=来单提醒
-            wsMsg.put("orderId", orders.getId());
-            wsMsg.put("content", "您有新的订单，请及时处理");
-            String msg = wsMsg.toJSONString();
-            log.info("WebSocket准备发送来单提醒: {}", msg);
-            webSocketServer.sendToAllClient(msg);
-            log.info("WebSocket来单提醒发送完毕");
-        } catch (Exception e) {
-            log.error("WebSocket来单提醒发送失败", e);
-        }
+        //通过MQ异步向商家发送来单提醒
+        orderNotifyProducer.sendNotify(1, orders.getId(), "您有新的订单，请及时处理");
 
         //封装vo返回结果
         OrderSubmitVO orderSubmitVO = OrderSubmitVO.builder()
@@ -371,12 +360,9 @@ public class OrderServiceImpl implements OrderService {
         if (ordersDB == null) {
             throw new OrderBusinessException(MessageConstant.ORDER_NOT_FOUND);
         }
-        // 通过WebSocket向商家发送催单提醒
-        JSONObject wsMsg = new JSONObject();
-        wsMsg.put("type", 2);  // 2=催单提醒
-        wsMsg.put("orderId", id);
-        wsMsg.put("content", "订单号" + ordersDB.getNumber() + "，用户催单了，请尽快处理");
-        webSocketServer.sendToAllClient(wsMsg.toJSONString());
+        // 通过MQ异步向商家发送催单提醒
+        orderNotifyProducer.sendNotify(2, id,
+                "订单号" + ordersDB.getNumber() + "，用户催单了，请尽快处理");
     }
 
     // ==================== 商家端 ====================

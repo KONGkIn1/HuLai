@@ -24,7 +24,7 @@ public class AliOssUtil {
      *
      * @param bytes
      * @param objectName
-     * @return
+     * @return 文件访问URL，上传失败返回null
      */
     public String upload(byte[] bytes, String objectName) {
 
@@ -35,17 +35,12 @@ public class AliOssUtil {
             // 创建PutObject请求。
             ossClient.putObject(bucketName, objectName, new ByteArrayInputStream(bytes));
         } catch (OSSException oe) {
-            System.out.println("Caught an OSSException, which means your request made it to OSS, "
-                    + "but was rejected with an error response for some reason.");
-            System.out.println("Error Message:" + oe.getErrorMessage());
-            System.out.println("Error Code:" + oe.getErrorCode());
-            System.out.println("Request ID:" + oe.getRequestId());
-            System.out.println("Host ID:" + oe.getHostId());
+            log.error("OSS上传失败, code={}, message={}, requestId={}",
+                    oe.getErrorCode(), oe.getErrorMessage(), oe.getRequestId());
+            return null;
         } catch (ClientException ce) {
-            System.out.println("Caught an ClientException, which means the client encountered "
-                    + "a serious internal problem while trying to communicate with OSS, "
-                    + "such as not being able to access the network.");
-            System.out.println("Error Message:" + ce.getMessage());
+            log.error("OSS客户端异常: {}", ce.getMessage(), ce);
+            return null;
         } finally {
             if (ossClient != null) {
                 ossClient.shutdown();
@@ -53,16 +48,9 @@ public class AliOssUtil {
         }
 
         //文件访问路径规则 https://BucketName.Endpoint/ObjectName
-        StringBuilder stringBuilder = new StringBuilder("https://");
-        stringBuilder
-                .append(bucketName)
-                .append(".")
-                .append(endpoint)
-                .append("/")
-                .append(objectName);
+        String fileUrl = "https://" + bucketName + "." + endpoint + "/" + objectName;
+        log.info("文件上传到:{}", fileUrl);
 
-        log.info("文件上传到:{}", stringBuilder.toString());
-
-        return stringBuilder.toString();
+        return fileUrl;
     }
 }
